@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="greenLine" type="color">#00ad4c</item>
+    <item name="blueLine" type="color">#0390d5</item>
+    <item name="silverLine" type="color">#a4a5a4</item>
+    <item name="redLine" type="color">#be1439</item>
+    <item name="orangeLine" type="color">#e38a01</item>
+    <item name="yellowLine" type="color">#f8d619</item>
+</resources>
