@@ -3,7 +3,7 @@ wearsmytrain
 
 Rough Android Wear prototype to show the next train time for the WMATA Metro System. This is meant for people's normal daily commutes (between home and work metro stations).
 
-On phone app, one time user input of: 
+On phone app, one time user input of:
 - Your home metro station (e.g. West Falls Church)
 - The end of line station for your home metro station (e.g. Vienna)
 - Your work metro station (e.g. Clarendon)
@@ -13,6 +13,7 @@ On watch app:
 - Displays how many minutes until the next train, tap screen to refresh
 
 **Currently, will only work if your home and work stations are on the same line**
+ 
 **No GPS location is currently used, but that would be a welcome enhancement to reduce user input via phone app**
 
 
