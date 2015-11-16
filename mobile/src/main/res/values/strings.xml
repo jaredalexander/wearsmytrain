@@ -9,5 +9,6 @@
     <string name="choose_home_end_of_line_station">Home End of Line Station</string>
     <string name="choose_work_end_of_line_station">Work End of Line Station</string>
     <string name="api_error">Something went wrong...</string>
+    <string name="invalid_api_key">Something went wrong..probably an invalid API key</string>
 
 </resources>

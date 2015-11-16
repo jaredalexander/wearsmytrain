@@ -20,6 +20,7 @@ import java.util.GregorianCalendar;
 
 public class WatchListenerService extends WearableListenerService {
     private static final String START_ACTIVITY_PATH = "/fetch-train-times";
+    private static final String TAG = "WatchListenerService";
     private GoogleApiClient mGoogleApiClient;
     private SharedPreferences mSharedPreferences;
 
@@ -84,6 +85,11 @@ public class WatchListenerService extends WearableListenerService {
     }
 
     public void parseAndSendBackResultToWatch(JsonObject result) {
+        if(result == null || result.get("statusCode").getAsInt() == 401){
+            Log.e(TAG,getString(R.string.invalid_api_key));
+            return;
+        }
+
         String endOfLineStation;
         if(mMorning){
             endOfLineStation = mSharedPreferences.getString(TrainSettingsActivity.WORK_END_OF_LINE_STATION,"");
