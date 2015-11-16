@@ -4,27 +4,23 @@ import android.app.Activity;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Spinner;
+import android.widget.Toast;
 
-import com.tysonsapps.wearsmytrain.async.FetchJSONTask;
-import com.tysonsapps.wearsmytrain.async.OnTaskCompleted;
-
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.koushikdutta.async.future.FutureCallback;
+import com.koushikdutta.ion.Ion;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.prefs.PreferencesFactory;
 
 
-public class TrainSettingsActivity extends Activity implements OnTaskCompleted{
+public class TrainSettingsActivity extends Activity{
     private Spinner mHomeStationSpinner;
     private Spinner mHomeEndOfLineStationSpinner;
 
@@ -64,147 +60,152 @@ public class TrainSettingsActivity extends Activity implements OnTaskCompleted{
         mHomeStationSpinner = (Spinner) findViewById(R.id.homeSpinner);
         mHomeEndOfLineStationSpinner = (Spinner) findViewById(R.id.homeEndOfLineSpinner);
 
-
-        FetchJSONTask fetchStationsTask = new FetchJSONTask(this,STATIONS);
-        fetchStationsTask.execute(BASE_URL + STATIONS + Constants.WMATA_API_KEY);
+        Ion.with(this)
+                .load(BASE_URL + STATIONS + Constants.WMATA_API_KEY)
+                .asJsonObject()
+                .setCallback(new FutureCallback<JsonObject>() {
+                    @Override
+                    public void onCompleted(Exception e, JsonObject result) {
+                        // do stuff with the result or error
+                        if(e == null){
+                            configureUI(result);
+                        }
+                        else{
+                            Toast.makeText(TrainSettingsActivity.this,R.string.api_error,Toast.LENGTH_LONG).show();
+                        }
+                    }
+                });
 
     }
 
-    @Override
-    public void onTaskCompleted(JSONObject result, String taskType) {
+    public void configureUI(JsonObject result) {
         if(result == null){
             return;
         }
-        if(taskType.equals(STATIONS)){
-            List<SpinnerItem> items = new ArrayList<SpinnerItem>();
-            try {
-                JSONArray stationsArray = result.getJSONArray("Stations");
-                for(int i = 0; i < stationsArray.length(); i++){
-                    items.add(new SpinnerItem(stationsArray.getJSONObject(i).getString("Name"), stationsArray.getJSONObject(i).getString("Code")));
+
+        List<SpinnerItem> items = new ArrayList<SpinnerItem>();
+        JsonArray stationsArray = result.getAsJsonArray("Stations");
+        for(int i = 0; i < stationsArray.size(); i++){
+            items.add(new SpinnerItem(stationsArray.get(i).getAsJsonObject().get("Name").getAsString(), stationsArray.get(i).getAsJsonObject().get("Code").getAsString()));
+        }
+
+        Collections.sort(items);
+
+        final ArrayAdapter homeStationsAdapter = new ArrayAdapter(this, android.R.layout.simple_spinner_item, items);
+        final ArrayAdapter homeEndOfLineStationsAdapter= new ArrayAdapter(this, android.R.layout.simple_spinner_item, items);
+
+        final ArrayAdapter workStationsAdapter = new ArrayAdapter(this, android.R.layout.simple_spinner_item, items);
+        final ArrayAdapter workEndOfLineStationsAdapter= new ArrayAdapter(this, android.R.layout.simple_spinner_item, items);
+
+        //home station
+
+        mHomeStationSpinner.setAdapter(homeStationsAdapter);
+
+        mHomeStationSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+
+            @Override
+            public void onItemSelected(AdapterView<?> adapterView, View view,
+                                       int position, long id) {
+                SpinnerItem item = (SpinnerItem) homeStationsAdapter.getItem(position);
+
+                if(mUserIsInteracting) {
+                    mEditor.putString(HOME_STATION_KEY, item.getId());
+                    mEditor.commit();
                 }
 
-                Collections.sort(items);
 
-                final ArrayAdapter homeStationsAdapter = new ArrayAdapter(this, android.R.layout.simple_spinner_item, items);
-                final ArrayAdapter homeEndOfLineStationsAdapter= new ArrayAdapter(this, android.R.layout.simple_spinner_item, items);
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> adapter) {  }
+        });
 
-                final ArrayAdapter workStationsAdapter = new ArrayAdapter(this, android.R.layout.simple_spinner_item, items);
-                final ArrayAdapter workEndOfLineStationsAdapter= new ArrayAdapter(this, android.R.layout.simple_spinner_item, items);
+        String preferredHomeStation = mSharedPreferences.getString(HOME_STATION_KEY,"");
+        for(int i = 0; i < items.size(); i++){
+            if(items.get(i).getId().equals(preferredHomeStation)){
+                mHomeStationSpinner.setSelection(i);
+            }
+        }
 
-                //home station
+        //home end of line station
+        mHomeEndOfLineStationSpinner.setAdapter(homeEndOfLineStationsAdapter);
 
-                mHomeStationSpinner.setAdapter(homeStationsAdapter);
+        mHomeEndOfLineStationSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 
-                mHomeStationSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> adapterView, View view,
+                                       int position, long id) {
+                SpinnerItem item = (SpinnerItem) homeEndOfLineStationsAdapter.getItem(position);
 
-                    @Override
-                    public void onItemSelected(AdapterView<?> adapterView, View view,
-                                               int position, long id) {
-                        SpinnerItem item = (SpinnerItem) homeStationsAdapter.getItem(position);
-
-                        if(mUserIsInteracting) {
-                            mEditor.putString(HOME_STATION_KEY, item.getId());
-                            mEditor.commit();
-                        }
-
-
-                    }
-                    @Override
-                    public void onNothingSelected(AdapterView<?> adapter) {  }
-                });
-
-                String preferredHomeStation = mSharedPreferences.getString(HOME_STATION_KEY,"");
-                for(int i = 0; i < items.size(); i++){
-                    if(items.get(i).getId().equals(preferredHomeStation)){
-                        mHomeStationSpinner.setSelection(i);
-                    }
+                if(mUserIsInteracting) {
+                    mEditor.putString(HOME_END_OF_LINE_STATION, item.getId());
+                    mEditor.commit();
                 }
 
-                //home end of line station
-                mHomeEndOfLineStationSpinner.setAdapter(homeEndOfLineStationsAdapter);
 
-                mHomeEndOfLineStationSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> adapter) {  }
+        });
 
-                    @Override
-                    public void onItemSelected(AdapterView<?> adapterView, View view,
-                                               int position, long id) {
-                        SpinnerItem item = (SpinnerItem) homeEndOfLineStationsAdapter.getItem(position);
+        String preferredEndOfLineHomeStation = mSharedPreferences.getString(HOME_END_OF_LINE_STATION,"");
+        for(int i = 0; i < items.size(); i++){
+            if(items.get(i).getId().equals(preferredEndOfLineHomeStation)){
+                mHomeEndOfLineStationSpinner.setSelection(i);
+            }
+        }
 
-                        if(mUserIsInteracting) {
-                            mEditor.putString(HOME_END_OF_LINE_STATION, item.getId());
-                            mEditor.commit();
-                        }
+        //work station
 
+        mWorkStationSpinner.setAdapter(workStationsAdapter);
 
-                    }
-                    @Override
-                    public void onNothingSelected(AdapterView<?> adapter) {  }
-                });
+        mWorkStationSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 
-                String preferredEndOfLineHomeStation = mSharedPreferences.getString(HOME_END_OF_LINE_STATION,"");
-                for(int i = 0; i < items.size(); i++){
-                    if(items.get(i).getId().equals(preferredEndOfLineHomeStation)){
-                        mHomeEndOfLineStationSpinner.setSelection(i);
-                    }
+            @Override
+            public void onItemSelected(AdapterView<?> adapterView, View view,
+                                       int position, long id) {
+                SpinnerItem item = (SpinnerItem) workStationsAdapter.getItem(position);
+
+                if(mUserIsInteracting) {
+                    mEditor.putString(WORK_STATION_KEY, item.getId());
+                    mEditor.commit();
+                }
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> adapter) {  }
+        });
+
+        String preferredWorkStation = mSharedPreferences.getString(WORK_STATION_KEY,"");
+        for(int i = 0; i < items.size(); i++){
+            if(items.get(i).getId().equals(preferredWorkStation)){
+                mWorkStationSpinner.setSelection(i);
+            }
+        }
+
+        //work end of line station
+        mWorkEndOfLineStationSpinner.setAdapter(workEndOfLineStationsAdapter);
+
+        mWorkEndOfLineStationSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+
+            @Override
+            public void onItemSelected(AdapterView<?> adapterView, View view,
+                                       int position, long id) {
+                SpinnerItem item = (SpinnerItem) workEndOfLineStationsAdapter.getItem(position);
+
+                if(mUserIsInteracting) {
+                    mEditor.putString(WORK_END_OF_LINE_STATION, item.getId());
+                    mEditor.commit();
                 }
 
-                //work station
 
-                mWorkStationSpinner.setAdapter(workStationsAdapter);
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> adapter) {  }
+        });
 
-                mWorkStationSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-
-                    @Override
-                    public void onItemSelected(AdapterView<?> adapterView, View view,
-                                               int position, long id) {
-                        SpinnerItem item = (SpinnerItem) workStationsAdapter.getItem(position);
-
-                        if(mUserIsInteracting) {
-                            mEditor.putString(WORK_STATION_KEY, item.getId());
-                            mEditor.commit();
-                        }
-                    }
-                    @Override
-                    public void onNothingSelected(AdapterView<?> adapter) {  }
-                });
-
-                String preferredWorkStation = mSharedPreferences.getString(WORK_STATION_KEY,"");
-                for(int i = 0; i < items.size(); i++){
-                    if(items.get(i).getId().equals(preferredWorkStation)){
-                        mWorkStationSpinner.setSelection(i);
-                    }
-                }
-
-                //work end of line station
-                mWorkEndOfLineStationSpinner.setAdapter(workEndOfLineStationsAdapter);
-
-                mWorkEndOfLineStationSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-
-                    @Override
-                    public void onItemSelected(AdapterView<?> adapterView, View view,
-                                               int position, long id) {
-                        SpinnerItem item = (SpinnerItem) workEndOfLineStationsAdapter.getItem(position);
-
-                        if(mUserIsInteracting) {
-                            mEditor.putString(WORK_END_OF_LINE_STATION, item.getId());
-                            mEditor.commit();
-                        }
-
-
-                    }
-                    @Override
-                    public void onNothingSelected(AdapterView<?> adapter) {  }
-                });
-
-                String preferredEndOfLineWorkStation = mSharedPreferences.getString(WORK_END_OF_LINE_STATION,"");
-                for(int i = 0; i < items.size(); i++){
-                    if(items.get(i).getId().equals(preferredEndOfLineWorkStation)){
-                        mWorkEndOfLineStationSpinner.setSelection(i);
-                    }
-                }
-
-            } catch (JSONException e) {
-                return;
+        String preferredEndOfLineWorkStation = mSharedPreferences.getString(WORK_END_OF_LINE_STATION,"");
+        for(int i = 0; i < items.size(); i++){
+            if(items.get(i).getId().equals(preferredEndOfLineWorkStation)){
+                mWorkEndOfLineStationSpinner.setSelection(i);
             }
         }
     }
@@ -214,23 +215,4 @@ public class TrainSettingsActivity extends Activity implements OnTaskCompleted{
         super.onUserInteraction();
         mUserIsInteracting = true;
     }
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.settings, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
-
-        return super.onOptionsItemSelected(item);
-    }
-
-
 }

@@ -1,10 +1,8 @@
 package com.tysonsapps.wearsmytrain;
 
-import android.annotation.SuppressLint;
 import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
 import android.util.Log;
-import android.widget.Toast;
 
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResultCallback;
@@ -12,18 +10,15 @@ import com.google.android.gms.wearable.MessageApi;
 import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.Wearable;
 import com.google.android.gms.wearable.WearableListenerService;
-import com.tysonsapps.wearsmytrain.async.FetchJSONTask;
-import com.tysonsapps.wearsmytrain.async.OnTaskCompleted;
-
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.koushikdutta.async.future.FutureCallback;
+import com.koushikdutta.ion.Ion;
 
 import java.util.Calendar;
-import java.util.Date;
 import java.util.GregorianCalendar;
 
-public class WatchListenerService extends WearableListenerService implements OnTaskCompleted {
+public class WatchListenerService extends WearableListenerService {
     private static final String START_ACTIVITY_PATH = "/fetch-train-times";
     private GoogleApiClient mGoogleApiClient;
     private SharedPreferences mSharedPreferences;
@@ -34,7 +29,6 @@ public class WatchListenerService extends WearableListenerService implements OnT
     private String mNodeId;
 
     private boolean mMorning;
-
 
     @Override
     public void onCreate() {
@@ -58,9 +52,6 @@ public class WatchListenerService extends WearableListenerService implements OnT
 
             mNodeId = messageEvent.getSourceNodeId();
 
-            FetchJSONTask fetchTimePredictions = new FetchJSONTask(this,PREDICTIONS);
-
-            Date date = new Date();
             Calendar calendar = GregorianCalendar.getInstance();
             int hour = calendar.get(Calendar.HOUR_OF_DAY);
 
@@ -75,15 +66,24 @@ public class WatchListenerService extends WearableListenerService implements OnT
             }
 
 
-
-            fetchTimePredictions.execute(BASE_URL + PREDICTIONS + "/" + station + Constants.WMATA_API_KEY);
+            Ion.with(this)
+                    .load(BASE_URL + PREDICTIONS + "/" + station + Constants.WMATA_API_KEY)
+                    .asJsonObject()
+                    .setCallback(new FutureCallback<JsonObject>() {
+                        @Override
+                        public void onCompleted(Exception e, JsonObject result) {
+                            // do stuff with the result or error
+                            if (e == null) {
+                                parseAndSendBackResultToWatch(result);
+                            }
+                        }
+                    });
 
         }
         stopSelf();
     }
 
-    @Override
-    public void onTaskCompleted(JSONObject result, String taskType) {
+    public void parseAndSendBackResultToWatch(JsonObject result) {
         String endOfLineStation;
         if(mMorning){
             endOfLineStation = mSharedPreferences.getString(TrainSettingsActivity.WORK_END_OF_LINE_STATION,"");
@@ -92,51 +92,43 @@ public class WatchListenerService extends WearableListenerService implements OnT
             endOfLineStation = mSharedPreferences.getString(TrainSettingsActivity.HOME_END_OF_LINE_STATION,"");
         }
 
-        try {
-            String jsonForWatch;
+        String jsonForWatch;
 
-            if(result != null) {
-                JSONArray trainPredictions = result.getJSONArray("Trains");
+        if(result != null) {
+            JsonArray trainPredictions = result.getAsJsonArray("Trains");
 
-                JSONObject nextTrainJSON = null;
+            JsonObject nextTrainJSON = null;
 
-                for (int i = 0; i < trainPredictions.length(); i++) {
-                    JSONObject obj = trainPredictions.getJSONObject(i);
-                    if (obj.getString("DestinationCode").equals(endOfLineStation)) {
-                        nextTrainJSON = obj;
-                        break;
-                    }
-                }
-
-
-                if (nextTrainJSON != null) {
-                    jsonForWatch = nextTrainJSON.toString();
-                } else {
-                    jsonForWatch = ""; //no trains...
+            for (int i = 0; i < trainPredictions.size(); i++) {
+                JsonObject obj = trainPredictions.get(i).getAsJsonObject();
+                if (obj.get("DestinationCode").getAsString().equals(endOfLineStation)) {
+                    nextTrainJSON = obj;
+                    break;
                 }
             }
-            else{
-                jsonForWatch = ""; //JSON didn't come back from API correctly...
-            }
 
-            Wearable.MessageApi.sendMessage(
-                    mGoogleApiClient, mNodeId, START_ACTIVITY_PATH, jsonForWatch.getBytes()).setResultCallback(
-                    new ResultCallback<MessageApi.SendMessageResult>() {
-                        @Override
-                        public void onResult(MessageApi.SendMessageResult sendMessageResult) {
-                            if (!sendMessageResult.getStatus().isSuccess()) {
-                                Log.d("PHONE OUTPUT","Connection failed (sync)!");
-                            } else {
-                                Log.d("PHONE OUTPUT","Successfully sent train times data!");
-                            }
-                        }
-                    }
-            );
-        } catch (JSONException e) {
-            e.printStackTrace();
+            if (nextTrainJSON != null) {
+                jsonForWatch = nextTrainJSON.toString();
+            } else {
+                jsonForWatch = ""; //no trains...
+            }
+        }
+        else{
+            jsonForWatch = ""; //JSON didn't come back from API correctly...
         }
 
-
-
+        Wearable.MessageApi.sendMessage(
+                mGoogleApiClient, mNodeId, START_ACTIVITY_PATH, jsonForWatch.getBytes()).setResultCallback(
+                new ResultCallback<MessageApi.SendMessageResult>() {
+                    @Override
+                    public void onResult(MessageApi.SendMessageResult sendMessageResult) {
+                        if (!sendMessageResult.getStatus().isSuccess()) {
+                            Log.d("PHONE OUTPUT","Connection failed (sync)!");
+                        } else {
+                            Log.d("PHONE OUTPUT","Successfully sent train times data!");
+                        }
+                    }
+                }
+        );
     }
 }
