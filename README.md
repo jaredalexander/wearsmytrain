@@ -12,6 +12,8 @@ On phone app, one time user input of:
 On watch app:
 - Displays how many minutes until the next train, tap screen to refresh
 
+**Grab an API key from https://developer.wmata.com/**
+
 **Currently, will only work if your home and work stations are on the same line**
  
 **No GPS location is currently used, but that would be a welcome enhancement to reduce user input via phone app**
