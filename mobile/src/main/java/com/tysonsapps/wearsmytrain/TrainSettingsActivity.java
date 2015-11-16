@@ -79,7 +79,7 @@ public class TrainSettingsActivity extends Activity{
     }
 
     public void configureUI(JsonObject result) {
-        if(result == null || result.get("statusCode").getAsInt() == 401){
+        if(result == null || (result.get("statusCode") != null && result.get("statusCode").getAsInt() == 401)){
             Toast.makeText(this,R.string.invalid_api_key,Toast.LENGTH_LONG).show();
             return;
         }

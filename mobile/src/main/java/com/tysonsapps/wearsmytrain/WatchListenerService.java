@@ -85,7 +85,7 @@ public class WatchListenerService extends WearableListenerService {
     }
 
     public void parseAndSendBackResultToWatch(JsonObject result) {
-        if(result == null || result.get("statusCode").getAsInt() == 401){
+        if(result == null || (result.get("statusCode") != null && result.get("statusCode").getAsInt() == 401)){
             Log.e(TAG,getString(R.string.invalid_api_key));
             return;
         }
@@ -107,7 +107,7 @@ public class WatchListenerService extends WearableListenerService {
 
             for (int i = 0; i < trainPredictions.size(); i++) {
                 JsonObject obj = trainPredictions.get(i).getAsJsonObject();
-                if (obj.get("DestinationCode").getAsString().equals(endOfLineStation)) {
+                if (obj.get("DestinationCode").isJsonNull() == false && obj.get("DestinationCode").getAsString().equals(endOfLineStation)) {
                     nextTrainJSON = obj;
                     break;
                 }
